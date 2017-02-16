@@ -4,14 +4,14 @@ This project contains the source code for the Local positioning System node firm
 
 # Useful notes for the UWB sniffer client for reading CIR
 The client script for plotting the firmware and some additional information is
-located in /tools/client/*.
-
-In order to set the anchor and perform basic debugging, use picocom to read the
+located in ``/tools/client/*``. In order to set the anchor and perform basic debugging, use picocom to read the
 serial port open with
 
     ``picocom /dev/ttyACMX``
     
-where ``X`` is the latched port (usually 0), and exit using ``C-a-x``.
+where ``X`` is the latched port (usually 0), and exit using ``C-a-x``. To visualize the data, remember
+to chmod -x the decode_cir.py scipt in
+order to make it executable.
 
 Note that if something goes wrong, the printed CIR will likely consist of
 newline characters ``\n``, converted to the hexadecimal ``0a`` in the bit
@@ -23,9 +23,6 @@ in hexadecimal form (note that the integers are signed!). Changing the chip the
 chip settings is done on startup, by
 
 dwSpiWrite32(dev, PMSC, PMSC_CTRL0_SUB, dwSpiRead32(dev, PMSC, PTRL0_SUB) | 0x00008040);
-
-In order to visualize the data, remember to chmod -x the decode_cir.py scipt in
-order to make it executable.
 
 ## Dependencies
 
