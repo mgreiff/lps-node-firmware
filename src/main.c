@@ -53,8 +53,7 @@ const uint8_t *uid = (uint8_t*)MCU_ID_ADDRESS;
 static void restConfig();
 static void changeAddress(uint8_t addr);
 static void handleInput(char ch);
-static void changeMode(unsigned int newMode);
-static void printModeList();
+static void changeMode(CfgMode newMode);
 static void printMode();
 static void help();
 
@@ -122,7 +121,13 @@ static void main_task(void *pvParameters) {
   // Printing UWB configuration
   struct uwbConfig_s * uwbConfig = uwbGetConfig();
   printf("CONFIG\t: Address is 0x%X\r\n", uwbConfig->address[0]);
-  printf("CONFIG\t: Mode is %s\r\n", uwbAlgorithmName(uwbConfig->mode));
+  printf("CONFIG\t: Mode is ");
+  switch (uwbConfig->mode) {
+    case modeAnchor: printf("Anchor\r\n"); break;
+    case modeTag: printf("Tag\r\n"); break;
+    case modeSniffer: printf("Sniffer\r\n"); break;
+    default: printf("UNKNOWN\r\n"); break;
+  }
   printf("CONFIG\t: Tag mode anchor list (%i): ", uwbConfig->anchorListSize);
   for (i = 0; i < uwbConfig->anchorListSize; i++) {
     printf("0x%02X ", uwbConfig->anchors[i]);
@@ -146,6 +151,7 @@ static void main_task(void *pvParameters) {
   // Main loop ...
   while(1) {
     usbcommPrintWelcomeMessage();
+    usbcommStartTransfers();
 
     ledTick();
     // // Measure pressure
@@ -191,68 +197,35 @@ int _write (int fd, const void *buf, size_t count)
 
 static void handleInput(char ch) {
   bool configChanged = true;
-  static enum menu_e {mainMenu, modeMenu} currentMenu = mainMenu;
 
-  switch (currentMenu) {
-    case mainMenu:
-      switch (ch) {
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-          changeAddress(ch - '0');
-          break;
-        case 'a': changeMode(MODE_ANCHOR); break;
-        case 't': changeMode(MODE_TAG); break;
-        case 's': changeMode(MODE_SNIFFER); break;
-        case 'm':
-          printModeList();
-          printf("Type 0-9 to choose new mode...\r\n");
-          currentMenu = modeMenu;
-          configChanged = false;
-          break;
-        case 'd': restConfig(); break;
-        case 'h':
-          help();
-          configChanged = false;
-          break;
-        case '#':
-          productionTestsRun();
-          printf("System halted, reset to continue\r\n");
-          while(true){}
-          break;
-        default:
-          configChanged = false;
-          break;
-      }
+  switch (ch) {
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+      changeAddress(ch - '0');
       break;
-    case modeMenu:
-      switch(ch) {
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-          changeMode(ch - '0');
-          currentMenu = mainMenu;
-          break;
-        default:
-          printf("Incorrect mode '%c'\r\n", ch);
-          currentMenu = mainMenu;
-          configChanged = false;
-          break;
-      }
+    case 'a': changeMode(modeAnchor); break;
+    case 't': changeMode(modeTag); break;
+    case 's': changeMode(modeSniffer); break;
+    case 'd': restConfig(); break;
+    case 'h':
+      help();
+      configChanged = false;
+      break;
+    case '#':
+      productionTestsRun();
+      printf("System halted, reset to continue\r\n");
+      while(true){}
+      break;
+    default:
+      configChanged = false;
       break;
   }
 
@@ -280,7 +253,7 @@ static void changeAddress(uint8_t addr) {
   }
 }
 
-static void changeMode(unsigned int newMode) {
+static void changeMode(CfgMode newMode) {
     printf("Previous device mode: ");
     printMode();
 
@@ -290,29 +263,16 @@ static void changeMode(unsigned int newMode) {
     printMode();
 }
 
-static void printModeList()
-{
-  unsigned int count = uwbAlgorithmCount();
-  int current_mode = -1;
-  uint8_t mode;
-
-  if (cfgReadU8(cfgMode, &mode)) {
-    current_mode = mode;
-  }
-
-  printf("-------------------\r\n");
-  printf("Available UWB modes:\r\n");
-  for (int i=0; i<count; i++) {
-    printf(" %d - %s%s\r\n", i, uwbAlgorithmName(i),
-                             (i == current_mode)?" (Current mode)":"");
-  }
-}
-
 static void printMode() {
-  uint8_t mode;
+  CfgMode mode;
 
   if (cfgReadU8(cfgMode, &mode)) {
-    printf(uwbAlgorithmName(mode));
+    switch (mode) {
+      case modeAnchor: printf("Anchor"); break;
+      case modeTag: printf("Tag"); break;
+      case modeSniffer: printf("Sniffer"); break;
+      default: printf("UNKNOWN"); break;
+    }
   } else {
     printf("Not found!");
   }
@@ -327,7 +287,6 @@ static void help() {
   printf("a   - anchor mode\r\n");
   printf("t   - tag mode\r\n");
   printf("s   - sniffer mode\r\n");
-  printf("m   - List and change mode\r\n");
   printf("d   - reset configuration\r\n");
   printf("h   - This help\r\n");
 }
@@ -343,7 +302,7 @@ int main() {
   SystemClock_Config();
 
   // Setup main task
-  xTaskCreateStatic( main_task, "main", configMINIMAL_STACK_SIZE, NULL, configMAX_PRIORITIES - 2, ucMainStack, &xMainTask );
+  xTaskCreateStatic( main_task, "main", configMINIMAL_STACK_SIZE, NULL, configMAX_PRIORITIES - 1, ucMainStack, &xMainTask );
 
   // Start the FreeRTOS scheduler
   vTaskStartScheduler();

@@ -39,8 +39,11 @@
 
 uint8_t base_address[] = {0,0,0,0,0,0,0xcf,0xbc};
 
-// System configuration
-static struct uwbConfig_s config;
+// Static system configuration
+static struct uwbConfig_s config = {
+  mode: modeAnchor,
+  address: {0,0,0,0,0,0,0xcf,0xbc},
+};
 
 // The four packets for ranging
 #define POLL 0x01   // Poll is initiated by the tag

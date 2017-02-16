@@ -29,7 +29,6 @@
 #include <string.h>
 #include "cfg.h"
 #include "eeprom.h"
-#include "uwb.h"
 
 typedef struct {
   uint8_t *data;
@@ -137,7 +136,7 @@ static bool write_defaults(void) {
   buffer[5] = buffer[0] + buffer[1];
   // Write the default address
   cfgWriteU8(cfgAddress, 0);
-  cfgWriteU8(cfgMode, MODE_ANCHOR);
+  cfgWriteU8(cfgMode, modeAnchor);
   cfgWriteU8list(cfgAnchorlist, default_anchor_list, sizeof(default_anchor_list));
   write_crc();
   if (!eepromWrite(0, buffer, 7))

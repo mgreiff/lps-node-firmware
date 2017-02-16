@@ -10,6 +10,12 @@ typedef enum {
   cfgAnchorlist
 } ConfigField;
 
+typedef enum {
+  modeAnchor = 0,
+  modeTag,
+  modeSniffer
+} CfgMode;
+
 void cfgInit();
 
 bool cfgReset(void);

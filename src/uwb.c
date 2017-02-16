@@ -35,24 +35,11 @@
 #include <semphr.h>
 #include <task.h>
 
-// Implemented UWB algoritm. The dummy one is at the end of this file.
-static uwbAlgorithm_t dummyAlgorithm;
+// Static algorithm
 extern uwbAlgorithm_t uwbTwrAnchorAlgorithm;
 extern uwbAlgorithm_t uwbTwrTagAlgorithm;
 extern uwbAlgorithm_t uwbSnifferAlgorithm;
-extern uwbAlgorithm_t uwbTdoaAlgorithm;
-static uwbAlgorithm_t *algorithm = &dummyAlgorithm;
-
-struct {
-  uwbAlgorithm_t *algorithm;
-  char *name;
-} availableAlgorithms[] = {
-  {.algorithm = &uwbTwrAnchorAlgorithm, .name = "TWR Anchor"},
-  {.algorithm = &uwbTwrTagAlgorithm,    .name = "TWR Tag"},
-  {.algorithm = &uwbSnifferAlgorithm,   .name = "Sniffer"},
-  {.algorithm = &uwbTdoaAlgorithm,      .name = "TDoA Anchor (experimental!)"},
-  {NULL, NULL},
-};
+static uwbAlgorithm_t *algorithm = &uwbTwrAnchorAlgorithm;
 
 // Low level radio handling context (to be separated)
 static bool isInit = false;
@@ -61,8 +48,9 @@ static SemaphoreHandle_t irqSemaphore;
 static dwDevice_t dwm_device;
 static dwDevice_t *dwm = &dwm_device;
 
-// System configuration
+// Static system configuration
 static struct uwbConfig_s config = {
+  mode: modeAnchor,
   address: {0,0,0,0,0,0,0xcf,0xbc},
 };
 
@@ -112,10 +100,16 @@ void uwbInit()
     cfgReadU8list(cfgAnchorlist, config.anchors, config.anchorListSize);
   }
 
-  if (config.mode < uwbAlgorithmCount()) {
-    algorithm = availableAlgorithms[config.mode].algorithm;
-  } else {
-    algorithm = &dummyAlgorithm;
+  switch(config.mode) {
+    case modeAnchor:
+      algorithm = &uwbTwrAnchorAlgorithm;
+      break;
+    case modeTag:
+      algorithm = &uwbTwrTagAlgorithm;
+      break;
+    case modeSniffer:
+      algorithm = &uwbSnifferAlgorithm;
+      break;
   }
 
   dwAttachSentHandler(dwm, txcallback);
@@ -139,25 +133,6 @@ bool uwbTest()
   return isInit;
 }
 
-int uwbAlgorithmCount()
-{
-  int count = 0;
-
-  while (availableAlgorithms[count].algorithm != NULL) {
-    count ++;
-  }
-  return count;
-}
-
-char * uwbAlgorithmName(unsigned int id)
-{
-  if (id < uwbAlgorithmCount()) {
-    return availableAlgorithms[id].name;
-  } else {
-    return "UKNOWN";
-  }
-}
-
 static int checkIrq()
 {
   return HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
@@ -173,7 +148,7 @@ static void uwbTask(void* parameters)
     if (xSemaphoreTake(irqSemaphore, timeout/portTICK_PERIOD_MS)) {
       do{
           dwHandleInterrupt(dwm);
-      } while(checkIrq() != 0);
+      } while(checkIrq() != 0); //while IRS line active (ARM can only do edge sensitive interrupts)
     } else {
       timeout = algorithm->onEvent(dwm, eventTimeout);
     }
@@ -220,19 +195,3 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   }
   portYIELD_FROM_ISR(higherPriorityTaskWoken);
 }
-
-/* Dummy algorithm (used if UKNOWN algorithm is selected ...)*/
-static void dummyInit(uwbConfig_t * config, dwDevice_t *dev)
-{
-  ;
-}
-
-static uint32_t dummyOnEvent(dwDevice_t *dev, uwbEvent_t event)
-{
-  return MAX_TIMEOUT;
-}
-
-static uwbAlgorithm_t dummyAlgorithm = {
-  .init = dummyInit,
-  .onEvent = dummyOnEvent,
-};

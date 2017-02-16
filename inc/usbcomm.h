@@ -11,4 +11,6 @@ void usbcommSetSystemStarted(bool init);
 
 void usbcommPrintWelcomeMessage();
 
+void usbcommStartTransfers();
+
 #endif // __USB_COMM_H__
